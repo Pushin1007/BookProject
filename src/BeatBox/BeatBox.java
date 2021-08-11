@@ -38,7 +38,8 @@ public class BeatBox {
         theFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         BorderLayout layout = new BorderLayout();
         JPanel background = new JPanel(layout);
-        background.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));// Пустая граница позволяет создать поля между краями панели для размещения компонентов
+        background.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));// Пустая граница позволяет создать поля
+        // между краями панели для размещения компонентов
 
         checkboxlist = new ArrayList<JCheckBox>();
         Box buttonBox = new Box(BoxLayout.Y_AXIS);
@@ -75,10 +76,9 @@ public class BeatBox {
         grid.setHgap(2);
         mainPanel = new JPanel(grid);
         background.add(BorderLayout.CENTER, mainPanel);
-/*
-Создаем флажки, присваеиваем им значения false (чтобы они были пустые), а затем жлбавляем из в массив ArrayList и на панель
- */
-        for (int i = 0; i < 256; i++) {
+
+        for (int i = 0; i < 256; i++) { // Создаем флажки, присваеиваем им значения false (чтобы они были пустые),
+            // а затем жлбавляем из в массив ArrayList и на панель
             JCheckBox c = new JCheckBox();
             c.setSelected(false);
             checkboxlist.add(c);
@@ -92,10 +92,8 @@ public class BeatBox {
         }
     }
 
-    public void setUpMidi() {
-        /*
-        Обычный Midi код для получения синтезатора, секвенсора и дорожки
-         */
+    public void setUpMidi() { //Обычный Midi код для получения синтезатора, секвенсора и дорожки
+
         try {
             sequencer = MidiSystem.getSequencer();
             sequencer.open();
@@ -107,42 +105,114 @@ public class BeatBox {
         }
     }
 
-    /*
-    Вот здесь мы преобразуем состояния флажков в Midi события и добавляем их на дорожку
-     */
-    public void buildTrackAndStert() {
+
+    public void buildTrackAndStert() { //Вот здесь мы преобразуем состояния флажков в Midi события и добавляем их на дорожку
         int[] trackList = null; //Создаем массив из 16 элементов чтобы хранить значения для каждого инструмента на  все 16 тактов
 
         sequence.deleteTrack(track);// избавляемся от старой дорожки
         track = sequence.createTrack(); // создаем новую дорожку
 
-        for (int i = 0; i < 16; i++) {
+        for (int i = 0; i < 16; i++) { //Делаем это для каждого инструмента
             trackList = new int[16];
 
-            int key = instruments[i];
+            int key = instruments[i]; // Задаем клавишу которая представляет инструмент. Массив содержит Midi-числа для каждого инструмента
 
-            for (int j = 0; j < 16; j++) {
+            for (int j = 0; j < 16; j++) { // Делаем это для каждого такта текущего ряда
 
                 JCheckBox jc = (JCheckBox) checkboxlist.get(j + (16 * 1));
-
+/*
+Установлен ли флажок на этом такте? если да то помещаем значение клавиши в текущую ячейку массива(ячейку, которая представляет такт).
+Если нет, то инструмент не должен играть в этом такте, поэтому присваиваем ему 0
+ */
                 if (jc.isSelected()) {
                     trackList[j] = key;
                 } else {
                     trackList[j] = 0;
                 }
             } // Закрываем внутренний цикл
-            makeTracks(trackList);
+
+            makeTracks(trackList); //Для этого инструмента и для всех 16 тактов создаем события и добавляем их на дорожку
             track.add(makeEvent(176, 1, 127, 0, 16));
         }// Закрываем внешний цикл
 
-    }
 
-    public class MyStartListener implements ActionListener {
+        track.add(makeEvent(192, 9, 1, 0, 15)); // Мы всегда должны быть уверены, что событие на такте 16 существует(они идут от 0 до 15).
+        //        Иначе BeatBox может не пройти ве 16 тактов, перед тем как заново начнет последовательность.
 
-        @Override
-        public void actionPerformed(ActionEvent e) {
+        try {
+            sequencer.setSequence(sequence);
+            sequencer.setLoopCount(sequencer.LOOP_CONTINUOUSLY);// Позволяет задать количество повторений цикла или как в этом случае, неприрывный  цикл
+            sequencer.start();
+            sequencer.setTempoInBPM(120);
 
+        } catch (Exception e) { // теперь мы проигрываем мелодию
+            e.printStackTrace();
         }
     }
 
-}
+    public class MyStartListener implements ActionListener { //Класс слушатель для кнопки старт
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            buildTrackAndStert();
+        }
+    } //Закрываем внутренний класс
+
+    public class MyStopListener implements ActionListener { //Класс слушатель для кнопки стоп
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            sequencer.stop();
+        }
+    }//Закрываем внутренний класс
+
+    public class MyUpTempoListener implements ActionListener { //Класс слушатель для кнопки добавить темп
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            float tempoFactor = sequencer.getTempoFactor();
+            sequencer.setTempoFactor((float) (tempoFactor * 1.03)); // Коэффициент темпа определяет темп синтезатора.
+            // по умолчанию он 1,0, поэтому щелчком мыши можно его изменить на +3%
+
+        }
+    }//Закрываем внутренний класс
+
+    public class MyDownTempoListener implements ActionListener { //Класс слушатель для кнопки убавить темп
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            float tempoFactor = sequencer.getTempoFactor();
+            sequencer.setTempoFactor((float) (tempoFactor * 1.03)); //Коэффициент темпа определяет темп синтезатора.
+            // по умолчанию он 1,0, поэтому щелчком мыши можно его изменить на -3%
+
+        }
+    }//Закрываем внутренний класс
+
+    public void makeTracks(int[] list) { // етод создает события  для одного инструмента за каждый проход цикла для всех 16 тактовю
+        //Можно получить int [] для Bass drumмент массива будет содержать либо клавишу этого инструмента либо ноль.
+        //Если ноль, то инструмент не должен играть в текущем такте.
+        //Иначе нужно создать событие и добавить его в дорожку.
+        for (int i = 0; i < 16; i++) {
+            int key = list[i];
+
+            if (key != 0) {
+                track.add(makeEvent(144, 9, key, 100, i)); //Создаем события включения и добавляем их в дорожку
+                track.add(makeEvent(128, 9, key, 100, i + 1)); //Создаем события выключения и добавляем их в дорожку
+            }
+        }
+    }
+
+
+    public MidiEvent makeEvent(int comd, int chan, int one, int two, int tick) {
+        MidiEvent event = null;
+        try {
+            ShortMessage a = new ShortMessage();
+
+            a.setMessage(comd, chan, one, two);
+            event = new MidiEvent(a, tick);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return event;
+    }
+} //Закрываем класс
